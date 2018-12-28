@@ -20,12 +20,12 @@ namespace FunctionApp
         private static DocumentClient client;
 
         [FunctionName("books")]
-        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route="books/{id?}")]HttpRequestMessage req, string id, TraceWriter log)
+        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Function, "get", "post", Route="books/{isbn?}")]HttpRequestMessage req, string isbn, TraceWriter log)
         {
             log.Info("C# HTTP trigger function processed a request.");
 
             client = new DocumentClient(new Uri(ConfigurationManager.AppSettings["endpoint"]), ConfigurationManager.AppSettings["authKey"]);
-            
+  
             switch (req.Method.ToString().ToLower())
             {
                 case "post":
@@ -36,7 +36,7 @@ namespace FunctionApp
                     try
                     {
                         Document document =
-                            await client.ReadDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, CollectionId, id));
+                            await client.ReadDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, CollectionId, isbn), new RequestOptions { PartitionKey = new PartitionKey(isbn) });
                         return req.CreateResponse(HttpStatusCode.OK, document);
                     }
                     catch (DocumentClientException e)
