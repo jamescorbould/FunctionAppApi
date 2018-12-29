@@ -31,7 +31,8 @@ namespace FunctionApp
                 case "post":
                     string data = await req.Content.ReadAsStringAsync();
                     var json = JsonConvert.DeserializeObject(data);
-                    return req.CreateResponse(HttpStatusCode.Created, json);
+                    ResourceResponse<Document> response = await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseId, CollectionId), json);
+                    return req.CreateResponse(HttpStatusCode.Created, response);
                 case "get":
                     try
                     {
