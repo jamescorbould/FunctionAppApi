@@ -47,20 +47,27 @@ namespace FunctionApp
                         KeyValuePair<string, string> kv = queryString.Single(qs => qs.Key == "categories");
                         string cats = kv.Value;
 
-                        IDocumentQuery<book> query = client.CreateDocumentQuery<book>(
+                        IDocumentQuery<Book> query = client.CreateDocumentQuery<Book>(
                                 UriFactory.CreateDocumentCollectionUri(DatabaseId, CollectionId),
                                 new FeedOptions { MaxItemCount = -1, EnableCrossPartitionQuery = true })
                             .Where(book => book.categories.Contains(cats))
                             .AsDocumentQuery();
 
-                        List<book> results = new List<book>();
+                        List<Book> results = new List<Book>();
 
                         while (query.HasMoreResults)
                         {
-                            results.AddRange(await query.ExecuteNextAsync<book>());
+                            results.AddRange(await query.ExecuteNextAsync<Book>());
                         }
 
-                        return req.CreateResponse(HttpStatusCode.OK, results);
+                        if (results.Count > 0)
+                        {
+                            return req.CreateResponse(HttpStatusCode.OK, results);
+                        }
+                        else
+                        {
+                            return req.CreateResponse(HttpStatusCode.NotFound);
+                        }
                     }
                     else
                     {
@@ -77,7 +84,7 @@ namespace FunctionApp
                         {
                             if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
                             {
-                                return null;
+                                return req.CreateResponse(HttpStatusCode.NotFound);
                             }
                             else
                             {

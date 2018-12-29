@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FunctionApp.Models
 {
-    class book
+    class Book
     {
         public string id { get; set; }
         public string isbn { get; set; }
