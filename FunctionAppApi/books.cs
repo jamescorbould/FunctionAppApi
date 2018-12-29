@@ -1,8 +1,12 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Configuration;
+using System.Linq;
+using System.Linq.Expressions;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
@@ -10,6 +14,8 @@ using Newtonsoft.Json;
 using Microsoft.Azure.Documents;
 using Microsoft.Azure.Documents.Client;
 using Microsoft.Azure.Documents.Linq;
+using Microsoft.Data.OData.Atom;
+using FunctionApp.Models;
 
 namespace FunctionApp
 {
@@ -34,21 +40,49 @@ namespace FunctionApp
                     ResourceResponse<Document> response = await client.CreateDocumentAsync(UriFactory.CreateDocumentCollectionUri(DatabaseId, CollectionId), json);
                     return req.CreateResponse(HttpStatusCode.Created, response);
                 case "get":
-                    try
+                    // Check if a predicated get.
+                    var queryString = req.GetQueryNameValuePairs().ToDictionary(x => x.Key, x => x.Value);
+                    if (queryString.ContainsKey("categories"))
                     {
-                        Document document =
-                            await client.ReadDocumentAsync(UriFactory.CreateDocumentUri(DatabaseId, CollectionId, isbn), new RequestOptions { PartitionKey = new PartitionKey(isbn) });
-                        return req.CreateResponse(HttpStatusCode.OK, document);
-                    }
-                    catch (DocumentClientException e)
-                    {
-                        if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
+                        KeyValuePair<string, string> kv = queryString.Single(qs => qs.Key == "categories");
+                        string cats = kv.Value;
+
+                        IDocumentQuery<book> query = client.CreateDocumentQuery<book>(
+                                UriFactory.CreateDocumentCollectionUri(DatabaseId, CollectionId),
+                                new FeedOptions { MaxItemCount = -1, EnableCrossPartitionQuery = true })
+                            .Where(book => book.categories.Contains(cats))
+                            .AsDocumentQuery();
+
+                        List<book> results = new List<book>();
+
+                        while (query.HasMoreResults)
                         {
-                            return null;
+                            results.AddRange(await query.ExecuteNextAsync<book>());
                         }
-                        else
+
+                        return req.CreateResponse(HttpStatusCode.OK, results);
+                    }
+                    else
+                    {
+                        // Non predicated get.
+                        try
                         {
-                            throw;
+                            Document document =
+                                await client.ReadDocumentAsync(
+                                    UriFactory.CreateDocumentUri(DatabaseId, CollectionId, isbn),
+                                    new RequestOptions {PartitionKey = new PartitionKey(isbn)});
+                            return req.CreateResponse(HttpStatusCode.OK, document);
+                        }
+                        catch (DocumentClientException e)
+                        {
+                            if (e.StatusCode == System.Net.HttpStatusCode.NotFound)
+                            {
+                                return null;
+                            }
+                            else
+                            {
+                                throw;
+                            }
                         }
                     }
                 default:
